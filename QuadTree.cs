@@ -1,6 +1,5 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
-using UnityEngine;
 
 /// <summary>
 /// Map 구조를 저장하는 QuadTree
@@ -9,10 +8,10 @@ using UnityEngine;
 /// </summary>
 public class QuadTree {
 
-    const int RIGHT_TOP = 0;
     const int LEFT_TOP = 1;
     const int LEFT_BOTTOM = 2;
-    const int RIGHT_BOTTOM = 3;
+    const int RIGHT_TOP = 3;
+    const int RIGHT_BOTTOM = 4;
 
     public class Node<T>
     {
@@ -28,48 +27,52 @@ public class QuadTree {
         //public List<Node<T>> child { get; set; }
         public Node<T>[] child { get; set; }
         public short size;
-
-        public bool IsInsert(short x, short y)
+        public short halfSize
         {
-            if(size > 1)
+            get
             {
-                if(index.x + (size/2) < x)
-                {
-                    return false;
-                }
-                if(index.y + (size/2) < y)
-                {
-                    return false;
-                }
-                if(index.x - (size/2) > x)
-                {
-                    return false;
-                }
-                if(index.y - (size/2) > y)
-                {
-                    return false;
-                }
+                return (short)(size / 2);
             }
-            //else
-            //{
-            //    if(index.x + 1 < x)
-            //    {
-            //        return false;
-            //    }
-            //    if(index.y + 1 < y)
-            //    {
-            //        return false;
-            //    }
-            //    if(index.x - 1 > x)
-            //    {
-            //        return false;
-            //    }
-            //    if(index.y - 1 > y)
-            //    {
-            //        return false;
-            //    }
-            //}
-            return true;
+        }
+
+        public short quaterSize
+        {
+            get
+            {
+                return (short)(size / 4);
+            }
+        }
+
+        public int IsInsert(short x, short y)
+        {
+            if (index.x == x && index.y == y)
+            {
+                return 0;
+            }
+            if (index.x > x)
+            {
+                if(index.y <= y)
+                {
+                    return LEFT_TOP;
+                }
+                else if(index.y > y)
+                {
+                    return LEFT_BOTTOM;
+                }
+                return -1;
+            }
+            else
+            {
+                if(index.y <= y)
+                {
+                    return RIGHT_TOP;
+                }
+                else if(index.y > y)
+                {
+                    return RIGHT_BOTTOM;
+                }
+                return -1;
+            }
         }
 
         public bool isMatch(short x, short y)
@@ -121,81 +124,82 @@ public class QuadTree {
 
     public void Insert(short x, short y, short val)
     {
+        if((Root.index.x + Root.halfSize -1)<x)
+        {
+            //x overflow
+            return;
+        }
+        else if((Root.index.x - Root.halfSize) > x)
+        {
+            //x underflow
+            return;
+        }
+        else if(Root.index.y + (Root.halfSize -1) < y)
+        {
+            //y overflow
+            return;
+        }
+        else if(Root.index.y - Root.halfSize > y)
+        {
+            //y underflow
+            return;
+        }
+
         Insert(ref Root, x, y, val);
     }
 
     Node<short> Insert(ref Node<short> dest,short x, short y, short val)
-    {        
-        if(!dest.IsInsert(x, y))
+    {
+        var v = dest.IsInsert(x, y);
+        if(v == 0)
         {
-            return null;
-        }
-
-        if(dest.isMatch(x, y))
-        {
+            //find it
             dest.data = val;
             return dest;
         }
-
-        if(dest.index.x < x)
+        else if(dest.size == 1)
         {
-            //Right
-            if(dest.index.y < y)
-            {
-                //Top
-                if(dest.child[RIGHT_TOP] == null)
-                {
-                    dest.child[RIGHT_TOP] = NewNode(ref dest, RIGHT_TOP, (short)(dest.index.x + dest.size/4), (short)(dest.index.y + dest.size/4), (short)(dest.size/2));
-                    return Insert(ref dest.child[RIGHT_TOP], x, y, val);
-                }
-                else
-                {
-                    return Insert(ref dest.child[RIGHT_TOP], x, y, val);
-                }
-            }
-            else
-            {
-                //Bottom
-                if(dest.child[RIGHT_BOTTOM] == null)
-                {
-                    dest.child[RIGHT_BOTTOM] = NewNode(ref dest, RIGHT_BOTTOM, (short)(dest.index.x + dest.size / 4), (short)(dest.index.y - dest.size / 4), (short)(dest.size / 2));
-                    return Insert(ref dest.child[RIGHT_BOTTOM], x, y, val);
-                }
-                else
-                {
-                    return Insert(ref dest.child[RIGHT_BOTTOM], x, y, val);
-                }
-            }
+            return null;
         }
         else
         {
-            //Left
-            if (dest.index.y < y)
+            if(dest.child[v -1] == null)
             {
-                //Top
-                if (dest.child[LEFT_TOP] == null)
+                dest.child[v - 1] = NewNode();
+                if(dest.size > 2)
                 {
-                    dest.child[LEFT_TOP] = NewNode(ref dest, LEFT_TOP, (short)(dest.index.x - dest.size / 4), (short)(dest.index.y + dest.size / 4), (short)(dest.size / 2));
-                    return Insert(ref dest.child[LEFT_TOP], x, y, val);
+                    dest.child[v - 1].index.x = (short)(dest.index.x + (dest.quaterSize * (short)((v <= 2) ? -1 : 1)));
+                    dest.child[v - 1].index.y = (short)(dest.index.y + (dest.quaterSize * (short)((v % 2 == 0) ? -1 : 1)));
                 }
                 else
                 {
-                    return Insert(ref dest.child[LEFT_TOP], x, y, val);
+                    switch(v)
+                    {
+                        case 1:
+                            //Left top
+                            dest.child[v-1].index.x = (short)(dest.index.x - 1);
+                            dest.child[v - 1].index.y = dest.index.y;
+                            break;
+                        case 2:
+                            //Left bottom
+                            dest.child[v - 1].index.x = (short)(dest.index.x - 1);
+                            dest.child[v - 1].index.y = (short)(dest.index.y - 1);
+                            break;
+                        case 3:
+                            //Right top
+                            dest.child[v - 1].index.x = dest.index.x;
+                            dest.child[v - 1].index.y = dest.index.y;
+                            break;
+                        case 4:
+                            //Right Bottom
+                            dest.child[v - 1].index.x = dest.index.x;
+                            dest.child[v - 1].index.y = (short)(dest.index.y - 1);
+                            break;
+                    }
                 }
+                dest.child[v - 1].size = (short)(dest.size / 2);
             }
-            else
-            {
-                //Bottom
-                if (dest.child[LEFT_BOTTOM] == null)
-                {
-                    dest.child[LEFT_BOTTOM] = NewNode(ref dest, LEFT_BOTTOM, (short)(dest.index.x - dest.size / 4), (short)(dest.index.y - dest.size / 4), (short)(dest.size / 2));
-                    return Insert(ref dest.child[LEFT_BOTTOM], x, y, val);
-                }
-                else
-                {
-                    return Insert(ref dest.child[LEFT_BOTTOM], x, y, val);
-                }
-            }
+            return Insert(ref dest.child[v - 1], x, y, val);
         }
     }
 
@@ -267,131 +271,7 @@ public class QuadTree {
         node.child = new Node<short>[4];
         return node;
     }
-
-    Node<short> NewNode(ref Node<short> parent, int index)
-    {
-        Node<short> node = NewNode();
-        switch (index)
-        {
-            case LEFT_TOP:
-                parent.child[LEFT_BOTTOM] = NewNode();
-                parent.child[LEFT_BOTTOM].index.x = (short)(parent.index.x);
-                parent.child[LEFT_BOTTOM].index.y = (short)(parent.index.y - 1);
-                parent.child[LEFT_BOTTOM].size = 0;
-                parent.child[LEFT_BOTTOM].parent = node;
-
-                parent.child[LEFT_TOP] = NewNode();
-                parent.child[LEFT_TOP].index.x = (short)(parent.index.x);
-                parent.child[LEFT_TOP].index.y = (short)(parent.index.y);
-                parent.child[LEFT_TOP].size = 0;
-                parent.child[LEFT_TOP].parent = node;
-
-                parent.child[RIGHT_TOP] = NewNode();
-                parent.child[RIGHT_TOP].index.x = (short)(parent.index.x + 1);
-                parent.child[RIGHT_TOP].index.y = (short)(parent.index.y);
-                parent.child[RIGHT_TOP].size = 0;
-                parent.child[RIGHT_TOP].parent = node;
-
-                parent.child[RIGHT_BOTTOM] = NewNode();
-                parent.child[RIGHT_BOTTOM].index.x = (short)(parent.index.x + 1);
-                parent.child[RIGHT_BOTTOM].index.y = (short)(parent.index.y - 1);
-                parent.child[RIGHT_BOTTOM].size = 0;
-                parent.child[RIGHT_BOTTOM].parent = node;
-                break;
-            case LEFT_BOTTOM:
-                parent.child[LEFT_BOTTOM] = NewNode();
-                parent.child[LEFT_BOTTOM].index.x = (short)(parent.index.x);
-                parent.child[LEFT_BOTTOM].index.y = (short)(parent.index.y);
-                parent.child[LEFT_BOTTOM].size = 0;
-                parent.child[LEFT_BOTTOM].parent = node;
-
-                parent.child[LEFT_TOP] = NewNode();
-                parent.child[LEFT_TOP].index.x = (short)(parent.index.x);
-                parent.child[LEFT_TOP].index.y = (short)(parent.index.y+1);
-                parent.child[LEFT_TOP].size = 0;
-                parent.child[LEFT_TOP].parent = node;
-
-                parent.child[RIGHT_TOP] = NewNode();
-                parent.child[RIGHT_TOP].index.x = (short)(parent.index.x + 1);
-                parent.child[RIGHT_TOP].index.y = (short)(parent.index.y + 1);
-                parent.child[RIGHT_TOP].size = 0;
-                parent.child[RIGHT_TOP].parent = node;
-
-                parent.child[RIGHT_BOTTOM] = NewNode();
-                parent.child[RIGHT_BOTTOM].index.x = (short)(parent.index.x + 1);
-                parent.child[RIGHT_BOTTOM].index.y = (short)(parent.index.y);
-                parent.child[RIGHT_BOTTOM].size = 0;
-                parent.child[RIGHT_BOTTOM].parent = node;
-                break;
-            case RIGHT_TOP:
-                parent.child[LEFT_BOTTOM] = NewNode();
-                parent.child[LEFT_BOTTOM].index.x = (short)(parent.index.x - 1);
-                parent.child[LEFT_BOTTOM].index.y = (short)(parent.index.y - 1);
-                parent.child[LEFT_BOTTOM].size = 0;
-                parent.child[LEFT_BOTTOM].parent = node;
-
-                parent.child[LEFT_TOP] = NewNode();
-                parent.child[LEFT_TOP].index.x = (short)(parent.index.x - 1);
-                parent.child[LEFT_TOP].index.y = (short)(parent.index.y);
-                parent.child[LEFT_TOP].size = 0;
-                parent.child[LEFT_TOP].parent = node;
-
-                parent.child[RIGHT_TOP] = NewNode();
-                parent.child[RIGHT_TOP].index.x = (short)(parent.index.x);
-                parent.child[RIGHT_TOP].index.y = (short)(parent.index.y);
-                parent.child[RIGHT_TOP].size = 0;
-                parent.child[RIGHT_TOP].parent = node;
-
-                parent.child[RIGHT_BOTTOM] = NewNode();
-                parent.child[RIGHT_BOTTOM].index.x = (short)(parent.index.x);
-                parent.child[RIGHT_BOTTOM].index.y = (short)(parent.index.y-1);
-                parent.child[RIGHT_BOTTOM].size = 0;
-                parent.child[RIGHT_BOTTOM].parent = node;
-                break;
-            case RIGHT_BOTTOM:
-                parent.child[LEFT_BOTTOM] = NewNode();
-                parent.child[LEFT_BOTTOM].index.x = (short)(parent.index.x - 1);
-                parent.child[LEFT_BOTTOM].index.y = (short)(parent.index.y);
-                parent.child[LEFT_BOTTOM].size = 0;
-                parent.child[LEFT_BOTTOM].parent = node;
-
-                parent.child[LEFT_TOP] = NewNode();
-                parent.child[LEFT_TOP].index.x = (short)(parent.index.x - 1);
-                parent.child[LEFT_TOP].index.y = (short)(parent.index.y + 1);
-                parent.child[LEFT_TOP].size = 0;
-                parent.child[LEFT_TOP].parent = node;
-
-                parent.child[RIGHT_TOP] = NewNode();
-                parent.child[RIGHT_TOP].index.x = (short)(parent.index.x);
-                parent.child[RIGHT_TOP].index.y = (short)(parent.index.y + 1);
-                parent.child[RIGHT_TOP].size = 0;
-                parent.child[RIGHT_TOP].parent = node;
-
-                parent.child[RIGHT_BOTTOM] = NewNode();
-                parent.child[RIGHT_BOTTOM].index.x = (short)(parent.index.x);
-                parent.child[RIGHT_BOTTOM].index.y = (short)(parent.index.y);
-                parent.child[RIGHT_BOTTOM].size = 0;
-                parent.child[RIGHT_BOTTOM].parent = node;
-                break;
-        }
-        return node;
-    }
-
-    Node<short> NewNode(ref Node<short> parent, int index, short x, short y, short size)
-    {        
-        var node = NewNode();
-        node.index.x = x;
-        node.index.y = y;
-        node.size = size;
-        node.parent = parent;
-
-        if(size == 0)
-        {
-            NewNode(ref parent, index);
-        }
-        return node;
-    }
-
+    
     void DeleteNode(ref Node<short> val)
     {
         val.child[0] = null;
