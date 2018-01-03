@@ -6,7 +6,7 @@ using System.Collections.Generic;
 /// 내부 node의 데이터는 short이며, 
 /// 이 short의 value는 각 맵의 타일의 타입과 같이 사용한다.
 /// </summary>
-public class QuadTree {
+public class QuadTree<T> {
 
     const int LEFT_TOP = 1;
     const int LEFT_BOTTOM = 2;
@@ -21,83 +21,85 @@ public class QuadTree {
             public T2 y { get; set; }
         }
 
-        public Pair<short, short> index { get; set; }
+        public Pair<float, float> index { get; set; }
         public T data { get; set; }
         public Node<T> parent { get; set; }
         //public List<Node<T>> child { get; set; }
         public Node<T>[] child { get; set; }
-        public short size;
-        public short halfSize
+        public float size;
+        public int depth = 0;
+        public float halfSize
         {
             get
             {
-                return (short)(size / 2);
+                return size / 2;
             }
         }
 
-        public short quaterSize
+        public float quaterSize
         {
             get
             {
-                return (short)(size / 4);
+                return size / 4;
             }
         }
 
-        public int IsInsert(short x, short y)
+        public int IsInsert(float x, float y)
         {
-            if (index.x == x && index.y == y)
+            if (isMatch(x, y))
             {
                 return 0;
             }
-            if (index.x > x)
+
+            if (index.x < x)
             {
-                if(index.y <= y)
-                {
-                    return LEFT_TOP;
-                }
-                else if(index.y > y)
-                {
-                    return LEFT_BOTTOM;
-                }
-                return -1;
-            }
-            else
-            {
-                if(index.y <= y)
+                //right
+                if (index.y < y)
                 {
                     return RIGHT_TOP;
                 }
-                else if(index.y > y)
+                else
                 {
                     return RIGHT_BOTTOM;
                 }
-                return -1;
+            }
+            else
+            {
+                //left
+                if (index.y < y)
+                {
+                    return LEFT_TOP;
+                }
+                else
+                {
+                    return LEFT_BOTTOM;
+                }
             }
         }
 
-        public bool isMatch(short x, short y)
+        public bool isMatch(float x, float y)
         {
-            if(isLeaf == false)
+            if (isLeaf == false)
             {
                 return false;
             }
-            if(index.x == x && index.y == y)
+            if ((int)index.x == (int)x && (int)index.y == (int)y)
             {
                 return true;
             }
-            return false;        
+            return false;
         }
 
-        bool isLeaf
+        public bool isLeaf
         {
             get
             {
-                return size == 0;
+                return size == 1;
             }
         }
     }
 
-    public Node<short> Root;
+    public Node<T> Root;
     int MAX = 16;
     int MAX_HALF
     {
@@ -106,7 +108,7 @@ public class QuadTree {
             return MAX / 2;
         }
     }
-    
+
     public QuadTree()
     {
         Root = NewNode();
@@ -119,27 +121,27 @@ public class QuadTree {
         Root.index.x = center_x;
         Root.index.y = center_y;
         Root.size = (short)size;
-        Root.data = -1;
+        Root.data = default(T);
     }
 
-    public void Insert(short x, short y, short val)
+    public void Insert(float x, float y, T val)
     {
-        if((Root.index.x + Root.halfSize -1)<x)
+        if ((Root.index.x + Root.halfSize - 1) < x)
         {
             //x overflow
             return;
         }
-        else if((Root.index.x - Root.halfSize) > x)
+        else if ((Root.index.x - Root.halfSize) > x)
         {
             //x underflow
             return;
         }
-        else if(Root.index.y + (Root.halfSize -1) < y)
+        else if (Root.index.y + (Root.halfSize - 1) < y)
         {
             //y overflow
             return;
         }
-        else if(Root.index.y - Root.halfSize > y)
+        else if (Root.index.y - Root.halfSize > y)
         {
             //y underflow
             return;
@@ -148,56 +150,50 @@ public class QuadTree {
         Insert(ref Root, x, y, val);
     }
 
-    Node<short> Insert(ref Node<short> dest,short x, short y, short val)
+    Node<T> Insert(ref Node<T> dest, float x, float y, T val)
     {
         var v = dest.IsInsert(x, y);
-        if(v == 0)
+        if (v == 0)
         {
             //find it
             dest.data = val;
             return dest;
         }
-        else if(dest.size == 1)
+        else if (dest.size == 1)
         {
             return null;
         }
         else
         {
-            if(dest.child[v -1] == null)
+            //Debug.Log("v is " + v);
+            if (dest.child[v - 1] == null)
             {
                 dest.child[v - 1] = NewNode();
-                if(dest.size > 2)
+                switch (v)
                 {
-                    dest.child[v - 1].index.x = (short)(dest.index.x + (dest.quaterSize * (short)((v <= 2) ? -1 : 1)));
-                    dest.child[v - 1].index.y = (short)(dest.index.y + (dest.quaterSize * (short)((v % 2 == 0) ? -1 : 1)));
+                    case 1:
+                        //Left top
+                        dest.child[v - 1].index.x = (dest.index.x - dest.quaterSize);
+                        dest.child[v - 1].index.y = (dest.index.y + dest.quaterSize);
+                        break;
+                    case 2:
+                        //Left bottom
+                        dest.child[v - 1].index.x = (dest.index.x - dest.quaterSize);
+                        dest.child[v - 1].index.y = (dest.index.y - dest.quaterSize);
+                        break;
+                    case 3:
+                        //Right top
+                        dest.child[v - 1].index.x = (dest.index.x + dest.quaterSize);
+                        dest.child[v - 1].index.y = (dest.index.y + dest.quaterSize);
+                        break;
+                    case 4:
+                        //Right Bottom
+                        dest.child[v - 1].index.x = (dest.index.x + dest.quaterSize);
+                        dest.child[v - 1].index.y = (dest.index.y - dest.quaterSize);
+                        break;
                 }
-                else
-                {
-                    switch(v)
-                    {
-                        case 1:
-                            //Left top
-                            dest.child[v-1].index.x = (short)(dest.index.x - 1);
-                            dest.child[v - 1].index.y = dest.index.y;
-                            break;
-                        case 2:
-                            //Left bottom
-                            dest.child[v - 1].index.x = (short)(dest.index.x - 1);
-                            dest.child[v - 1].index.y = (short)(dest.index.y - 1);
-                            break;
-                        case 3:
-                            //Right top
-                            dest.child[v - 1].index.x = dest.index.x;
-                            dest.child[v - 1].index.y = dest.index.y;
-                            break;
-                        case 4:
-                            //Right Bottom
-                            dest.child[v - 1].index.x = dest.index.x;
-                            dest.child[v - 1].index.y = (short)(dest.index.y - 1);
-                            break;
-                    }
-                }
-                dest.child[v - 1].size = (short)(dest.size / 2);
+                dest.child[v - 1].size = dest.halfSize;
+                dest.child[v - 1].depth = dest.depth + 1;
             }
             return Insert(ref dest.child[v - 1], x, y, val);
         }
@@ -209,17 +205,17 @@ public class QuadTree {
         DeleteNode(ref n);
     }
 
-    public short Find(int x, int y)
+    public T Find(int x, int y)
     {
         return Find(ref Root, x, y, MAX).data;
     }
 
-    public Node<short> FindNode(int x, int y)
+    public Node<T> FindNode(int x, int y)
     {
         return Find(ref Root, x, y, MAX);
     }
 
-    Node<short> Find(ref Node<short> dest, int x, int y, int size)
+    Node<T> Find(ref Node<T> dest, int x, int y, int size)
     {
         if (dest.index.x == x && dest.index.y == y)
         {
@@ -258,21 +254,21 @@ public class QuadTree {
         }
     }
 
-    public void Set(int x, int y, short val)
+    public void Set(int x, int y, T val)
     {
         var n = FindNode(x, y);
-        n.data = val;        
+        n.data = val;
     }
 
-    Node<short> NewNode()
+    Node<T> NewNode()
     {
-        Node<short> node = new Node<short>();
-        node.index = new Node<short>.Pair<short, short>();
-        node.child = new Node<short>[4];
+        Node<T> node = new Node<T>();
+        node.index = new Node<T>.Pair<float, float>();
+        node.child = new Node<T>[4];
         return node;
     }
-    
-    void DeleteNode(ref Node<short> val)
+
+    void DeleteNode(ref Node<T> val)
     {
         val.child[0] = null;
         val.child[1] = null;
@@ -281,7 +277,7 @@ public class QuadTree {
 
         for (int i = 0; i < val.parent.child.Length; i++)
         {
-            if(val.parent.child[i] == val)
+            if (val.parent.child[i] == val)
             {
                 val.parent.child[i] = null;
                 break;
@@ -290,8 +286,13 @@ public class QuadTree {
 
         val.parent = null;
         val.index = null;
-        val.data = 0;
+        val.data = val.data;
         val.size = 0;
         val = null;
+    }
+
+    public Node<T> GetRoot()
+    {
+        return Root;
     }
 }

@@ -10,7 +10,7 @@ namespace QuadTree_1
     {
         static void Main(string[] args)
         {
-            QuadTree t = new QuadTree(0,0, 16);
+            QuadTree<short> t = new QuadTree<short>(0,0, 16);
             t.Insert(1, 1, 2);
             t.Insert(0, 1, 2);
             t.Insert(1, 0, 2);
